@@ -1,0 +1,4 @@
+flask>=3.0
+opencv-python>=4.8
+mediapipe>=0.10.9,<0.10.20
+pigpio>=1.78

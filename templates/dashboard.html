@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AutoMirror Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen">
+  <header class="border-b border-slate-800 bg-slate-900/70 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-bold text-slate-950">AM</div>
+        <div>
+          <h1 class="text-lg font-semibold leading-tight">AutoMirror</h1>
+          <p class="text-xs text-slate-400">Face-tracking rear-view mirror</p>
+        </div>
+      </div>
+      <span id="badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-700 text-slate-300">STOPPED</span>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6 grid gap-6 lg:grid-cols-3">
+    <!-- Live feed -->
+    <section class="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-slate-800">
+        <h2 class="font-semibold">Live Camera</h2>
+        <div class="flex items-center gap-2 text-xs text-slate-400">
+          <span class="h-2 w-2 rounded-full bg-red-500 animate-pulse"></span> LIVE
+          <span id="fps" class="ml-2 font-mono">0 FPS</span>
+        </div>
+      </div>
+      <div class="bg-black aspect-[4/3] flex items-center justify-center">
+        <img src="/video_feed" alt="Camera feed" class="w-full h-full object-contain">
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="space-y-6">
+      <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+        <h2 class="font-semibold mb-4">Auto Mode</h2>
+        <div class="grid grid-cols-2 gap-3">
+          <button id="startBtn" onclick="send('start')" class="py-3 rounded-xl font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition">▶ Start</button>
+          <button id="stopBtn" onclick="send('stop')" class="py-3 rounded-xl font-semibold bg-rose-500 hover:bg-rose-400 text-white transition">■ Stop</button>
+        </div>
+        <p class="text-xs text-slate-400 mt-3">Start: mirror follows your face. Stop: mirror locks at its current position.</p>
+      </div>
+
+      <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5 space-y-5">
+        <h2 class="font-semibold">Servo Angles</h2>
+
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="text-slate-400">Pan (Left / Right)</span>
+            <span id="panVal" class="font-mono text-cyan-300">90.0°</span>
+          </div>
+          <div class="relative h-3 rounded-full bg-slate-800">
+            <div class="absolute left-1/2 top-0 h-3 w-px bg-slate-600"></div>
+            <div id="panDot" class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-cyan-400 shadow-lg shadow-cyan-500/40 transition-all duration-200" style="left:50%"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="text-slate-400">Tilt (Up / Down)</span>
+            <span id="tiltVal" class="font-mono text-violet-300">90.0°</span>
+          </div>
+          <div class="relative h-3 rounded-full bg-slate-800">
+            <div class="absolute left-1/2 top-0 h-3 w-px bg-slate-600"></div>
+            <div id="tiltDot" class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-5 w-5 rounded-full bg-violet-400 shadow-lg shadow-violet-500/40 transition-all duration-200" style="left:50%"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 pt-2 text-center">
+          <div class="rounded-xl bg-slate-800/70 p-3">
+            <p class="text-xs text-slate-400">Target Pan</p>
+            <p id="tPan" class="font-mono text-lg">90.0°</p>
+          </div>
+          <div class="rounded-xl bg-slate-800/70 p-3">
+            <p class="text-xs text-slate-400">Target Tilt</p>
+            <p id="tTilt" class="font-mono text-lg">90.0°</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+        <h2 class="font-semibold mb-3">Status</h2>
+        <ul class="text-sm space-y-2">
+          <li class="flex justify-between"><span class="text-slate-400">Face detected</span><span id="face" class="font-semibold">—</span></li>
+          <li class="flex justify-between"><span class="text-slate-400">Face offset X / Y</span><span id="off" class="font-mono">0 / 0</span></li>
+          <li class="flex justify-between"><span class="text-slate-400">Servo state</span><span id="state" class="font-semibold">Locked</span></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    async function send(action) {
+      await fetch('/' + action, { method: 'POST' });
+      refresh();
+    }
+    // map angle to 0..100% across the +/- limit range
+    const pct = (a, c, lim) => 50 + ((a - c) / lim) * 50;
+
+    async function refresh() {
+      try {
+        const s = await (await fetch('/status')).json();
+        $('badge').textContent = s.running ? 'AUTO • RUNNING' : 'STOPPED • LOCKED';
+        $('badge').className = 'px-3 py-1 rounded-full text-xs font-semibold ' +
+          (s.running ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-700 text-slate-300');
+        $('fps').textContent = s.fps + ' FPS';
+        $('panVal').textContent = s.pan.toFixed(1) + '°';
+        $('tiltVal').textContent = s.tilt.toFixed(1) + '°';
+        $('tPan').textContent = s.target_pan.toFixed(1) + '°';
+        $('tTilt').textContent = s.target_tilt.toFixed(1) + '°';
+        $('panDot').style.left = pct(s.pan, s.center, s.pan_limit) + '%';
+        $('tiltDot').style.left = pct(s.tilt, s.center, s.tilt_limit) + '%';
+        $('face').textContent = s.face ? 'Yes' : 'No';
+        $('face').className = 'font-semibold ' + (s.face ? 'text-emerald-400' : 'text-amber-400');
+        $('off').textContent = s.offset_x + ' / ' + s.offset_y;
+        $('state').textContent = s.running ? 'Adjusting' : 'Locked';
+        $('state').className = 'font-semibold ' + (s.running ? 'text-emerald-400' : 'text-slate-300');
+        $('startBtn').classList.toggle('opacity-50', s.running);
+        $('stopBtn').classList.toggle('opacity-50', !s.running);
+      } catch (e) { $('badge').textContent = 'DISCONNECTED'; }
+    }
+    setInterval(refresh, 300);
+    refresh();
+  </script>
+</body>
+</html>
