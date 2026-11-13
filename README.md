@@ -20,15 +20,19 @@ templates/dashboard.html
 - Connect the buck converter **GND to a Pi GND pin**.
 - Only one servo fitted? Set `USE_TILT = False` in `app.py`.
 
-## Install (Raspberry Pi OS 64-bit, Python 3.9–3.11)
+## Install (Raspberry Pi OS 64-bit)
+MediaPipe 0.10.x needs Python 3.9–3.12. Newer Pi OS ships Python 3.13, so use `uv` to make a Python 3.11 venv:
 ```bash
 sudo apt update
-sudo apt install -y pigpio python3-venv libatlas-base-dev
+sudo apt install -y git pigpio libopenblas-dev libgl1
 sudo systemctl enable --now pigpiod
 
-python3 -m venv venv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
+
+uv venv --python 3.11 venv
 source venv/bin/activate
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 ## Run
