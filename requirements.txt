@@ -2,4 +2,5 @@ flask>=3.0
 numpy<2
 opencv-python>=4.8,<4.11
 mediapipe>=0.10.9,<0.10.20
+rpi-hardware-pwm>=0.2
 pigpio>=1.78

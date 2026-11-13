@@ -11,6 +11,8 @@ import cv2
 import mediapipe as mp
 from flask import Flask, Response, jsonify, render_template
 
+from servo_driver import Servos
+
 # ----------------------------- CONFIGURATION ------------------------------
 CAMERA_INDEX = 0
 FRAME_W, FRAME_H = 640, 480
@@ -34,27 +36,15 @@ MAX_SPEED = 10.0      # servo speed limit in deg/second  (lower = slower)
 DEADZONE = 1.5        # ignore changes smaller than this (deg) - stops jitter
 SMOOTHING = 0.15      # 0..1, lower = smoother face target
 
-MIN_PULSE, MAX_PULSE = 600, 2400   # MG995 pulse range in microseconds
-JPEG_QUALITY = 70
+JPEG_QUALITY = 70        # (servo pulse range: MIN_PULSE/MAX_PULSE in servo_driver.py)
 # --------------------------------------------------------------------------
 
-try:
-    import pigpio
-    pi = pigpio.pi()
-    if not pi.connected:
-        raise RuntimeError("pigpiod not running")
-except Exception as exc:  # lets you test on a PC without hardware
-    print(f"[WARN] pigpio unavailable ({exc}) - servos simulated.")
-    pi = None
-
-
-def angle_to_pulse(angle):
-    return int(MIN_PULSE + (angle / 180.0) * (MAX_PULSE - MIN_PULSE))
+servos = Servos([PAN_PIN, TILT_PIN] if USE_TILT else [PAN_PIN])
+print(f"[INFO] Servo output: {servos.backend}")
 
 
 def set_servo(pin, angle):
-    if pi:
-        pi.set_servo_pulsewidth(pin, angle_to_pulse(angle))
+    servos.set_angle(pin, angle)
 
 
 class Mirror:
@@ -210,8 +200,4 @@ if __name__ == "__main__":
     try:
         app.run(host="0.0.0.0", port=5000, threaded=True)
     finally:
-        if pi:
-            # stop sending pulses on exit (servo relaxes)
-            pi.set_servo_pulsewidth(PAN_PIN, 0)
-            pi.set_servo_pulsewidth(TILT_PIN, 0)
-            pi.stop()
+        servos.close()  # stop sending pulses on exit (servo relaxes)

@@ -7,25 +7,20 @@ Usage:
     python servo.py tilt      # test only tilt (GPIO18)
 
 Stop with Ctrl+C (or `pkill -f servo.py`) - servos are switched off on exit.
-Needs pigpiod running:  sudo systemctl start pigpiod   (or: sudo pigpiod)
+Uses hardware PWM (dtoverlay=pwm-2chan) or pigpio - see servo_driver.py.
 """
 import signal
 import sys
 import time
 
-import pigpio
+from servo_driver import Servos, angle_to_pulse
 
 PAN_PIN = 19    # Servo 2 (left/right)
 TILT_PIN = 18   # Servo 1 (up/down)
 
-MIN_PULSE, MAX_PULSE = 600, 2400   # same as app.py
 LOW, HIGH = 60, 120                # sweep range in degrees (90 = centre)
 STEP = 2                           # degrees per step
 DELAY = 0.03                       # seconds per step (bigger = slower)
-
-
-def angle_to_pulse(angle):
-    return int(MIN_PULSE + (angle / 180.0) * (MAX_PULSE - MIN_PULSE))
 
 
 def main():
@@ -34,14 +29,12 @@ def main():
     if pins is None:
         sys.exit("Usage: python servo.py [pan|tilt|both]")
 
-    pi = pigpio.pi()
-    if not pi.connected:
-        sys.exit("pigpiod is not running. Start it with: sudo systemctl start pigpiod")
+    servos = Servos(pins)
+    if servos.backend == "simulated":
+        sys.exit("No servo output - see the warnings above.")
 
     def cleanup(*_):
-        for p in pins:
-            pi.set_servo_pulsewidth(p, 0)   # stop pulses -> servo relaxes
-        pi.stop()
+        servos.close()   # stop pulses -> servo relaxes
         print("\nServos off. Bye.")
         sys.exit(0)
 
@@ -50,10 +43,10 @@ def main():
 
     def move(angle):
         for p in pins:
-            pi.set_servo_pulsewidth(p, angle_to_pulse(angle))
+            servos.set_angle(p, angle)
         print(f"\rAngle: {angle:5.1f} deg   pulse: {angle_to_pulse(angle)} us ", end="", flush=True)
 
-    print(f"Testing {which} servo(s) on GPIO {pins}. Ctrl+C to stop.")
+    print(f"Testing {which} servo(s) on GPIO {pins} using {servos.backend}. Ctrl+C to stop.")
     move(90)
     time.sleep(1)
 

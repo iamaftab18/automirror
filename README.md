@@ -24,8 +24,11 @@ templates/dashboard.html
 MediaPipe 0.10.x needs Python 3.9–3.12. Newer Pi OS ships Python 3.13, so use `uv` to make a Python 3.11 venv:
 ```bash
 sudo apt update
-sudo apt install -y git pigpio libopenblas-dev libgl1
-sudo systemctl enable --now pigpiod
+sudo apt install -y git libopenblas-dev libgl1
+
+# enable hardware PWM on GPIO18 + GPIO19 (jitter-free servos, no daemon)
+echo "dtoverlay=pwm-2chan" | sudo tee -a /boot/firmware/config.txt
+sudo reboot
 
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
@@ -62,6 +65,7 @@ Open `http://<PI_IP>:5000` from any device on the network (find the IP with `hos
 ## Notes
 - Centre both servos (90°) before fitting horns; at startup the servos move to 90°.
 - The camera sits in the fixed enclosure, so the system uses face position directly (no feedback from the mirror).
-- Without `pigpiod` (e.g. testing on a PC) servos are simulated and the dashboard still works.
+- Servo output (`servo_driver.py`) uses hardware PWM first, then `pigpiod` if running, otherwise servos are simulated (e.g. testing on a PC) and the dashboard still works.
+- Test the servos alone with `python servo.py` (or `servo.py pan` / `servo.py tilt`).
 - Start with the mirror clamp loosened/no mirror to check directions first.
 - Run at boot: create a systemd service that runs `venv/bin/python app.py` after `pigpiod`.
